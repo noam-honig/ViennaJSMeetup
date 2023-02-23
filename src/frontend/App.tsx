@@ -1,32 +1,34 @@
-import { FormEvent, useState } from 'react'
-import { Task } from './Task'
+import { FormEvent, useEffect, useState } from 'react'
+import { remult } from 'remult'
+import { Task } from '../shared/Task'
+import { TasksController } from '../shared/TasksController'
+
+const taskRepo = remult.repo(Task)
 
 function App() {
-  const [tasks, setTasks] = useState<Task[]>([
-    { id: 1, title: 'Setup', completed: true },
-    { id: 2, title: 'Entities', completed: false },
-    { id: 3, title: 'Paging, Sorting and Filtering', completed: false },
-    { id: 4, title: 'CRUD Operations', completed: false },
-    { id: 5, title: 'Live Query', completed: false },
-    { id: 6, title: 'Validation', completed: false },
-    { id: 7, title: 'Backend methods', completed: false },
-    { id: 8, title: 'Database', completed: false },
-    { id: 9, title: 'Authentication and Authorization', completed: false },
-    { id: 10, title: 'Deployment', completed: false }
-  ])
+  const [tasks, setTasks] = useState<Task[]>([])
+
+  useEffect(() => {
+    return taskRepo
+      .liveQuery({
+        where: {
+          completed: undefined
+        }
+      })
+      .subscribe((info) => setTasks(info.applyChanges))
+  }, [])
   const [newTaskTitle, setNewTaskTitle] = useState('')
 
   const addTask = async (e: FormEvent) => {
     e.preventDefault()
     try {
-      setTasks([
-        ...tasks,
-        {
+      
+        await taskRepo.insert({
           title: newTaskTitle,
           completed: false,
           id: tasks.length + 1
-        }
-      ])
+        })
+      
       setNewTaskTitle('')
     } catch (error: any) {
       alert(error.message)
@@ -34,7 +36,8 @@ function App() {
   }
 
   const setAllCompleted = async (completed: boolean) => {
-    setTasks(tasks.map((task) => ({ ...task, completed })))
+    
+    await TasksController.setAllCompleted(completed)
   }
 
   return (
@@ -52,14 +55,22 @@ function App() {
           setTasks((tasks) => tasks.map((t) => (t === task ? value : t)))
 
         const setCompleted = async (completed: boolean) => {
-          setTask({ ...task, completed })
+          setTask(await taskRepo.save({ ...task, completed }))
         }
         const setTitle = (title: string) => {
           setTask({ ...task, title })
         }
         const deleteTask = async () => {
           try {
-            setTasks(tasks.filter((t) => t !== task))
+            await taskRepo.delete(task)
+            
+          } catch (error: any) {
+            alert(error.message)
+          }
+        }
+        const saveTask = async () => {
+          try {
+            setTask(await taskRepo.save(task))
           } catch (error: any) {
             alert(error.message)
           }
@@ -73,6 +84,7 @@ function App() {
               onChange={(e) => setCompleted(e.target.checked)}
             />
             <input
+              onBlur={saveTask}
               value={task.title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -81,9 +93,7 @@ function App() {
         )
       })}
       <footer>
-        <button onClick={() => setAllCompleted(true)}>
-          Set all completed
-        </button>
+        <button onClick={() => setAllCompleted(true)}>Set all completed</button>
         <button onClick={() => setAllCompleted(false)}>
           Set all uncompleted
         </button>
